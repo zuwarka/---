@@ -1,233 +1,319 @@
-#include "Processor.h"
 #include <iostream>
+#include <time.h>
+#include "Processor.h"
 
 using namespace std;
 
-enum
-{
-	DENIED,
-	ALLOWED,
-	ACCESSED
-};
+enum 
+{ 
+	DENIED, 
+	ALLOWED, 
+	ACCESSED 
+}; //имена доступа
 
-enum
-{
-	REQUEST,
-	FREEING
-};
+enum 
+{ 
+	REQUEST, 
+	FREE
+}; //имена команд
 
-const int N = 4; //���-�� ������ �����������-������
-int ACCESS = DENIED; //���������� ������� � ����� ������-����������
+int ACCESS = DENIED; //переменная доступа
 
 Processor::Processor()
 {
 	this->Pn = 0;
-	this->K = 0;
-	this->M = 0;
 	this->Kr = 0;
+	this->M = 0;
+	this->K = 0;
+	this->N = 4; //4 блока "по умолчанию"
 	lead_time = new int[N];
-	delay = new int[N];
-	number_memory = new int[N];
-	commands = new int* [N];
+	memory_access = new int[N];
+	data = new int* [N];
 
-	for (int i = 0; i < N; i++)
+	for (int i = 0; i < N; i++) 
 	{
-		number_memory[i] = ALLOWED;
+		memory_access[i] = ALLOWED;
 		lead_time[i] = 0;
-		delay[i] = 1;
-		commands[i] = new int[K];
+		data[i] = new int[K];
 	}
 }
 
-Processor::Processor(int Pn, int K, int M, int Kr)
+Processor::Processor(int Pn, int Kr, int M, int K, int N) 
 {
 	this->Pn = Pn;
-	this->K = K;
-	this->M = M;
 	this->Kr = Kr;
-	lead_time = new int[N];
-	delay = new int[N];
-	number_memory = new int[N];
-	commands = new int* [N];
+	this->M = M;
+	this->K = K;
+	this->N = N;
+	memory_access = new int[this->N];
+	lead_time = new int[this->N];
+	data = new int* [this->N];
 
-	for (int i = 0; i < N; i++)
+	for (int i = 0; i < this->N; i++)
 	{
-		number_memory[i] = ALLOWED;
+		memory_access[i] = ALLOWED;
 		lead_time[i] = 0;
-		delay[i] = 1;
-		commands[i] = new int[K];
+		data[i] = new int[this->K];
 	}
 }
 
-Processor::~Processor()
+Processor::~Processor() 
 {
-	for (int i = 0; i < N; i++)
+	for (int i = 0; i < N; i++) 
 	{
-		delete commands[i];
+		delete[] data[i];
 	}
-	delete commands[];
-	delete lead_time[];
-	delete number_memory[];
+
+	delete[] data;
+	delete[] memory_access;
+	delete[] lead_time;
 }
 
-void Processor::set()
+void Processor::set_pn(int Pn)
 {
-	for (int i = 0; i < N; i++)
-	{
-		int delta_K = K - ((K * Kr) / 100); //K - Kr, ��� Kr - �������� �� �
-		int delta_K_percent = delta_K * Pn / 100; //������� � ��������� � ������ �-�r
-		int number_memory = 0; //����� ����� ������
+	this->Pn = Pn;
+}
 
-		for (int j = 0; j < K; j++)
+void Processor::set_kr(int Kr)
+{
+	this->Kr = Kr;
+}
+
+void Processor::set_m(int M)
+{
+	this->M = M;
+}
+
+void Processor::set_k(int K)
+{
+	this->K = K;
+}
+
+void Processor::set_n(int N)
+{
+	this->N = N;
+}
+
+void Processor::set_data_to_memory() 
+{
+	for (int id = 0; id < N; id++) 
+	{
+		srand(time(NULL) - 100 * id);
+		int delta_K = K - K * Kr / 100; //кол-во команд, требующих обращение в память
+		int delta_K_to_block = delta_K * Pn / 100; //кол-во команд, которые будут обращены в один кокнретный блок памяти
+		int memory = 0;
+
+		for (int i = 0; i < K; i++) 
 		{
+			if (delta_K && rand() % ((K - i) / delta_K) == 0) //если дельта_к и рандом от 0 до (отношение декремента кол-ва команд на
+			{												  //число команд, требующих обращение в память) = 0
+				if (delta_K - delta_K_to_block != 0 && rand() % (delta_K / (delta_K - delta_K_to_block)) == 0) //если разность дельты_к и дельта_к_блок не равна нулю
+				{																							   //и рандом от 0 до отношения дельты_к на разность дельта_к и
+					while (true)																			   //дельта_к_блок. С каждым шагом уменьшаем кол-во команд к 
+					{																						   //конкретному блоку памяти
+						memory = rand() % N + 1; //блок памяти от 1 до N
 
-		}
-	}
-}
-
-void Processor::commutator()
-{
-	int access;
-	for (int i = 0; i < K; i++)
-	{
-		for (int j = 0; j < N; j++)
-		{
-			if (commands[j][i])
-			{
-				cout << "Data transfer request" << "\t|\t" << "P" << commands[j][i] << "\t|\tProc" << j + 1 << "\t|" << endl;
-				while (1)
-				{
-					access = memory();
-					if (access == ACCESSED)
-					{
-						cout << "Access allowed" << "\t\t\t|\t" << "P" << commands[j][i] << "\t|\tProc" << j + 1 << "\t|" << endl;
-						lead_time[j] += M * 50;
-						break;
-					}
-					else
-					{
-						lead_time[j] += 200 * delay[j];
-						delay[j]++;
-						cout << "Waiting memory" << "\t\t\t|\t" << "P" << commands[j][i] << "\t|\tProc" << j + 1 << "\t|" << endl;
-						memory();
+						if (memory != id + 1)
+							break;
 					}
 				}
+				else //если рандом не выпал, то идем к следующему блоку памяти, уменьшая кол-во команд до блока
+				{
+					memory = id + 1;
+					delta_K_to_block--;
+				}
+
+				data[id][i] = memory;
+				delta_K--;
 			}
-			else
+			else 
 			{
-				lead_time[j] += 100;
-				cout << "Without memory request" << "\t\t|\t-\t|\tProc" << j + 1 << "\t|" << endl;
+				data[id][i] = 0; //команда, не требующая обращения к блоку памяти
 			}
-		}
-		for (int i = 0; i < N; i++)
-		{
-			number_memory[i] = ALLOWED;
-			delay[i] = 1;
 		}
 	}
-	cout << "Commutator: " << time_function() << endl;
 }
 
-void Processor::bus()
+void Processor::commutator(int flag) 
 {
 	int access;
 	int delay = 1;
-	for (int i = 0; i < K; i++)
+	for (int i = 0; i < K; i++) 
 	{
-		for (int j = 0; j < N; j++)
+		for (int id = 0; id < N; id++) 
 		{
-			if (commands[j][i])
+			if (data[id][i]) 
 			{
-				cout << "Data transfer request" << "\t|\t" << "P" << commands[j][i] << "\t|\tProc" << j + 1 << "\t|" << endl;
-				while (1)
+				if (flag == 1)
 				{
-					access = memory();
-					if (access == ACCESSED)
+					cout << "Data transfer request" << "\t" << data[id][i] << "\tProc " << id + 1 << endl;
+				}
+				while (true) 
+				{
+					access = memory(REQUEST, data[id][i]);
+
+					if (access == ACCESSED) 
 					{
-						cout << "Access allowed" << "\t\t\t|\t" << "P" << commands[j][i] << "\t|\tProc" << j + 1 << "\t|" << endl;
-						lead_time[j] += M * 50;
+						if (flag == 1)
+						{
+							cout << "Memory access" << "\t\t" << data[id][i] << "\tProc " << id + 1 << "\t" << endl;
+						}
+						lead_time[id] += M;
 						break;
 					}
-					else
+					else 
 					{
-						lead_time[j] += 200 * delay;
+						if (flag == 1)
+						{
+							cout << "Memory wait" << "\t\t" << data[id][i] << "\tProc " << id + 1 << "\t" << endl;
+						}
+						lead_time[id] += 1 * delay;
 						delay++;
-						cout << "Waiting memory" << "\t\t\t|\t" << "P" << commands[j][i] << "\t|\tProc" << j + 1 << "\t|" << endl;
-						memory();
+						memory(FREE, data[id][i]);
 					}
 				}
 			}
-			else
+			else 
 			{
-				lead_time[j] += 100;
-				cout << "Without memory request" << "\t\t|\t-\t|\tProc" << j + 1 << "\t|" << endl;
+				lead_time[id] += 1;
+				if (flag == 1)
+				{
+					cout << "Without memory request" << "\t-" << "\tProc " << id + 1 << "\t" << endl;
+				}
+			}
+		}
+
+		for (int i = 0; i < N; i++) 
+		{
+			memory_access[i] = ALLOWED;
+		}
+		delay = 1;
+	}
+
+	if (flag == 1)
+	{
+		cout << endl;
+	}
+	cout << "Work time commutator: " << worktime() << endl;
+	if (flag == 1)
+	{
+		cout << endl;
+	}
+}
+
+void Processor::bus(int flag) 
+{
+	int access;
+	int delay = 1;
+	for (int i = 0; i < K; i++) 
+	{
+		for (int id = 0; id < N; id++)
+		{
+			if (data[id][i]) 
+			{
+				if (flag == 1)
+				{
+					cout << "Data transfer request" << "\t" << data[id][i] << "\tProc " << id + 1 << "\t" << endl;
+				}
+				while (true) 
+				{
+					access = memory(REQUEST);
+
+					if (access == ACCESSED) 
+					{
+						if (flag == 1)
+						{
+							cout << "Memory access" << "\t\t" << data[id][i] << "\tProc " << id + 1 << "\t" << endl;
+						}
+						lead_time[id] += M;
+						break;
+					}
+					else 
+					{
+						if (flag == 1)
+						{
+							cout << "Memory wait" << "\t\t" << data[id][i] << "\tProc " << id + 1 << "\t" << endl;
+						}
+						lead_time[id] += 1 * delay;
+						delay++;
+						memory(FREE);
+					}
+				}
+			}
+			else 
+			{
+				lead_time[id] += 1;
+				if (flag == 1)
+				{
+					cout << "Without memory request" << "\t-" << "\tProc " << id + 1 << "\t" << endl;
+				}
 			}
 		}
 		delay = 1;
 	}
-	cout << "Bus: " << time_function() << endl;
+	if (flag == 1)
+	{
+		cout << endl;
+	}
+	cout << "Work time bus: " << worktime() << endl;
+	if (flag == 1)
+	{
+		cout << endl;
+	}
+	//system("pause");
 }
 
-int Processor::memory(int req, int num)
+int Processor::memory(int req, int num) //функция доступа к памяти для коммутатора
 {
-	ACCESS = number_memory[num - 1];
-	if (ACCESS == ALLOWED && req == REQUEST)
+	ACCESS = memory_access[num - 1]; //переменной аксес присваиваем команду из массива имен доступа
+	if (ACCESS == ALLOWED && req == REQUEST) 
 	{
 		ACCESS = DENIED;
-		number_memory[num - 1] = DENIED;
+		memory_access[num - 1] = DENIED;
 		return ACCESSED;
 	}
-	else
+	else if (ACCESS == DENIED && req == REQUEST) 
 	{
-		if (ACCESS == DENIED && req == REQUEST)
-		{
-			return DENIED;
-		}
-		else
-		{
-			if (ACCESS == DENIED && req == FREEING)
-			{
-				ACCESS = ALLOWED;
-			}
-		}
+		return DENIED;
+	}
+	else if (ACCESS == DENIED && req == FREE) 
+	{
+		ACCESS = ALLOWED;
 	}
 
-	number_memory[num - 1] = ALLOWED;
+	memory_access[num - 1] = ALLOWED;
 	return ACCESS;
 }
 
-int Processor::memory(int req) 
+int Processor::memory(int req) //функция доступа к памяти для шины - не используется массив имен доступа
 {
-	if (ACCESS == ALLOWED && request == REQUEST) 
+	if (ACCESS == ALLOWED && req == REQUEST) 
 	{
 		ACCESS = DENIED;
 		return ACCESSED;
 	}
-	else
+	else if (ACCESS == DENIED && req == FREE) 
 	{
-		if (ACCESS == DENIED && request == FREEING)
-		{
-			ACCESS = ALLOWED;
-		}
+		ACCESS = ALLOWED;
 	}
+
 	return ACCESS;
 }
 
-int Processor::time_function()
-{
-	int time_func = 0;
-	for (int i = 0; i < N; i++)
+int Processor::worktime() //выбирает время той программы, которая работает за наибольшее кол-во единиц времени
+{						  //тобеш время самой медленной программы. Это и есть время работы коммуникационной сети
+	int max = 0;
+	for (int i = 0; i < N; ++i) 
 	{
-		if (lead_time[i] > time_func)
+		if (lead_time[i] > max) 
 		{
-			time_func = lead_time[i];
+			max = lead_time[i];
 		}
 	}
 
-	for (int i = 0; i < N; i++)
+	for (int i = 0; i < N; i++) 
 	{
 		lead_time[i] = 0;
 	}
-
-	return time_func / 50;
+	return max;
 }
