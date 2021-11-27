@@ -48,6 +48,10 @@ void Menu::processor_settings()
 	}
 
 	cout << "\nWorktime report for bus and commutator:" << endl;
+	if (flag == 1)
+	{
+		cout << "\n" << "Command name" << "\t\t" << "Command to" << "\t" << "Processor" << "\n" << endl;
+	}
 	proc.commutator(flag);
 	proc.bus(flag);
 }
